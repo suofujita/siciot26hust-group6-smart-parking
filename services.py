@@ -5,7 +5,6 @@ FMT = "%Y-%m-%d %H:%M:%S"
 
 import sqlite3
 
-
 def handle_entry(rfid_uid):
     """Trả về (ok, msg)."""
     rfid_uid = str(rfid_uid)

@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Smart-Parking</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+  <noscript><meta http-equiv="refresh" content="3"></noscript>
+</head>
+<body>
+  {# Biến app.py cần truyền: sessions, daily_revenue, active_sessions (danh sách ô đỗ từ parking_slots).
+     Tuỳ chọn (không truyền thì hiện dấu "–"): lcd_free, oled_left, oled_right, total_slots. #}
+  {% set total = total_slots|default(4) %}
+
+  {% macro oled_zone(title, free, arrow) %}
+    <div class="oled__zone">
+      <span class="oled__title">{{ title }}</span>
+      <span class="oled__num">{% if free is none %}-{% elif free > 0 %}{{ free }}{% else %}X{% endif %}</span>
+      <span class="oled__arrow">{% if free is none %}{% elif free > 0 %}{{ arrow }}{% else %}HET{% endif %}</span>
+    </div>
+  {% endmacro %}
+
+  <header class="topbar">
+    <div class="wrap topbar__inner">
+      <h1>Theo dõi bãi gửi xe thông minh</h1>
+      <span class="live"><span class="live__dot"></span>Tự cập nhật mỗi 3 giây</span>
+    </div>
+  </header>
+
+  <main class="wrap">
+
+    <!-- Tổng quan -->
+    <section class="stats" aria-label="Tổng quan">
+      <div class="card stat">
+        <span class="stat__label">Doanh thu trong ngày</span>
+        <span class="stat__value">{{ '{:,}'.format((daily_revenue or 0)|int)|replace(',', '.') }}<small> VND</small></span>
+      </div>
+      <div class="card stat">
+        <span class="stat__label">Chỗ trống (theo thẻ RFID)</span>
+        <span class="stat__value">
+          {% if lcd_free is defined and lcd_free is not none %}{{ lcd_free }}<small> / {{ total }}</small>{% else %}–{% endif %}
+        </span>
+      </div>
+      <div class="card stat">
+        <span class="stat__label">Xe đang trong bãi</span>
+        <span class="stat__value">
+          {% if lcd_free is defined and lcd_free is not none %}{{ total - lcd_free }}<small> xe</small>{% else %}–{% endif %}
+        </span>
+      </div>
+    </section>
+
+    <!-- Trạng thái các ô đỗ (cảm biến) -->
+    <section>
+      <h2>Trạng thái các ô đỗ</h2>
+      <div class="slots">
+        {% for slot in active_sessions %}
+        <div class="card slot slot--{{ slot.status }}">
+          <span class="slot__code">{{ slot.slot_code }}</span>
+          <span class="badge badge--{{ slot.status }}">{{ 'Có xe' if slot.status == 'occupied' else 'Trống' }}</span>
+          <span class="slot__time">{{ slot.updated_at or 'Chưa có cập nhật' }}</span>
+        </div>
+        {% else %}
+        <p class="empty">Chưa có dữ liệu ô đỗ.</p>
+        {% endfor %}
+      </div>
+    </section>
+
+    <!-- Màn hình thông báo: mô phỏng lại đúng nội dung trên thiết bị thật -->
+    <section>
+      <h2>Màn hình thông báo</h2>
+      <div class="displays">
+        <div class="card">
+          <h3>LCD ngoài cổng</h3>
+          {% if lcd_free is defined and lcd_free is not none %}
+            {% set line2 = 'DA HET CHO' if lcd_free == 0 else (lcd_free ~ '/' ~ total) %}
+          {% else %}
+            {% set line2 = '--' %}
+          {% endif %}
+<pre class="lcd">{{ 'TONG CHO TRONG'.center(16) }}
+{{ line2.center(16) }}</pre>
+        </div>
+        <div class="card">
+          <h3>OLED trong bãi</h3>
+          <div class="oled">
+            {{ oled_zone('KHU TRAI', oled_left|default(none), '<-') }}
+            {{ oled_zone('KHU PHAI', oled_right|default(none), '->') }}
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Lịch sử -->
+    <section>
+      <h2>Lịch sử hoạt động</h2>
+      <div class="card table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>RFID UID</th>
+              <th>Thời gian vào</th>
+              <th>Thời gian ra</th>
+              <th class="num">Phí (VND)</th>
+              <th>Trạng thái</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for s in sessions %}
+            <tr>
+              <td><code>{{ s.rfid_uid }}</code></td>
+              <td>{{ s.time_in }}</td>
+              <td>{{ s.time_out or '—' }}</td>
+              <td class="num">{% if s.fee is not none %}{{ '{:,}'.format(s.fee|int)|replace(',', '.') }}{% else %}—{% endif %}</td>
+              <td><span class="badge badge--{{ s.status }}">{{ 'Đang gửi' if s.status == 'active' else 'Đã ra' }}</span></td>
+            </tr>
+            {% else %}
+            <tr><td colspan="5" class="empty">Chưa có lượt gửi xe nào.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+  </main>
+
+  <footer class="wrap footer">Smart Parking · dữ liệu từ parking.db</footer>
+
+  <script>setTimeout(function () { location.reload(); }, 3000);</script>
+</body>
+</html>
